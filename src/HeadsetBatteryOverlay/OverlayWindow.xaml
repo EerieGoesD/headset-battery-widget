@@ -46,11 +46,15 @@
                 </TextBlock>
 
                 <TextBlock Margin="0,2,0,0" FontSize="10" HorizontalAlignment="Center">
-                    <Hyperlink NavigateUri="https://github.com/EerieGoesD/hyperx-cloud2-wireless-battery-widget/issues" RequestNavigate="Hyperlink_RequestNavigate" Foreground="#63636E" TextDecorations="">Report Issue</Hyperlink>
+                    <Hyperlink NavigateUri="https://github.com/EerieGoesD/headset-battery-widget/issues/new?template=bug-report.md" RequestNavigate="Hyperlink_RequestNavigate" Foreground="#63636E" TextDecorations="">Report Issue</Hyperlink>
                 </TextBlock>
 
                 <TextBlock Margin="0,2,0,0" FontSize="10" HorizontalAlignment="Center">
-                    <Hyperlink NavigateUri="https://github.com/EerieGoesD/hyperx-cloud2-wireless-battery-widget/discussions/" RequestNavigate="Hyperlink_RequestNavigate" Foreground="#63636E" TextDecorations="">Feedback</Hyperlink>
+                    <Hyperlink NavigateUri="https://github.com/EerieGoesD/headset-battery-widget/discussions/" RequestNavigate="Hyperlink_RequestNavigate" Foreground="#63636E" TextDecorations="">Feedback</Hyperlink>
+                </TextBlock>
+
+                <TextBlock Margin="0,2,0,0" FontSize="10" HorizontalAlignment="Center">
+                    <Hyperlink NavigateUri="https://github.com/EerieGoesD/headset-battery-widget/issues/new?template=feature-request.md" RequestNavigate="Hyperlink_RequestNavigate" Foreground="#63636E" TextDecorations="">Request Feature</Hyperlink>
                 </TextBlock>
             </StackPanel>
 
