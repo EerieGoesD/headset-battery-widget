@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Headset Battery Widget</title>
+    <script type="module" src="/main.js" defer></script>
+  </head>
+
+  <body>
+    <div class="card" id="card" data-tauri-drag-region>
+      <button class="close-btn" id="btnQuit" title="Quit">&#215;</button>
+      <div class="main" data-tauri-drag-region>
+        <div class="left" data-tauri-drag-region>
+          <div class="battery" id="battery" data-tauri-drag-region>
+            <div class="battery-body" data-tauri-drag-region>
+              <div class="battery-fill" id="batteryFill" data-tauri-drag-region></div>
+            </div>
+            <div class="battery-cap" data-tauri-drag-region></div>
+          </div>
+
+          <div class="links" data-tauri-drag-region>
+            <span class="muted">Made by <a data-url="https://eeriegoesd.com" class="accent">EERIE</a></span>
+            <a data-url="https://buymeacoffee.com/eeriegoesd" class="gold">Support This Project</a>
+            <a data-url="https://github.com/EerieGoesD/headset-battery-widget/issues/new?template=bug-report.md" class="muted">Report Issue</a>
+            <a data-url="https://github.com/EerieGoesD/headset-battery-widget/discussions/" class="muted">Feedback</a>
+            <a data-url="https://github.com/EerieGoesD/headset-battery-widget/issues/new?template=feature-request.md" class="muted">Request Feature</a>
+          </div>
+        </div>
+
+        <div class="right" data-tauri-drag-region>
+          <div class="percent-row" data-tauri-drag-region>
+            <span class="percent" id="percentText" data-tauri-drag-region>--%</span>
+            <button class="mini" id="btnCompact" title="Compact">&#8722;</button>
+            <button class="mini" id="btnExpand" title="Expand" style="display:none">&#43;</button>
+            <button class="mini" id="btnSettings" title="Settings">&#9881;</button>
+          </div>
+
+          <div class="status" id="statusText" data-tauri-drag-region>Starting...</div>
+
+          <div class="settings" id="settingsPanel" style="display:none" data-tauri-drag-region>
+            <label class="chk">
+              <input type="checkbox" id="chkTopmost" checked />
+              <span class="box"></span>
+              <span>Always on Top</span>
+            </label>
+
+            <label class="chk">
+              <input type="checkbox" id="chkNotify" />
+              <span class="box"></span>
+              <span>Low-battery alert</span>
+            </label>
+
+            <div class="threshold-row" data-tauri-drag-region>
+              <span>Alert at</span>
+              <input type="number" id="numThreshold" min="1" max="99" value="20" />
+              <span>%</span>
+            </div>
+
+            <label class="chk">
+              <input type="checkbox" id="chkAutostart" />
+              <span class="box"></span>
+              <span>Launch at startup</span>
+            </label>
+
+            <label class="chk">
+              <input type="checkbox" id="chkHideTaskbar" />
+              <span class="box"></span>
+              <span>Hide taskbar (tray icon remains)</span>
+            </label>
+
+            <button class="link-btn" id="btnDiag">Diagnostics</button>
+            <pre class="diag" id="diagOut" style="display:none"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
