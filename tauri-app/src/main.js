@@ -3,6 +3,7 @@ const { getCurrentWindow } = window.__TAURI__.window;
 const { listen } = window.__TAURI__.event;
 
 const appWindow = getCurrentWindow();
+const isMac = navigator.userAgent.toLowerCase().includes("mac");
 
 // Replace the WebView2 browser menu (Inspect / Save as / Print...) with our own
 // native right-click menu: Refresh now, Diagnostics, Exit.
@@ -17,6 +18,16 @@ const NORMAL_POLL = 15000;
 let pollTimer = null;
 let refreshing = false;
 let lowNotified = false;
+let batteryStarted = false;
+
+// Licensing / trial state.
+const TRIAL_DAYS = 7;
+let owned = false;
+let trialStartMs = 0;
+let trialActive = false;
+let hasAccess = true;
+let needsTrialStart = false;
+let unlockPrice = ""; // localized App Store price (e.g. "4,99 €"); empty until fetched
 
 const store = {
   get(key, fallback) {
@@ -35,10 +46,19 @@ const store = {
 
 const $ = (id) => document.getElementById(id);
 
-// Resize the OS window to hug the card content (handles compact / settings changes).
+// Whichever of the battery / trial / paywall cards is currently visible.
+function visibleCard() {
+  for (const id of ["card", "trialCard", "lockCard"]) {
+    const el = $(id);
+    if (el && el.style.display !== "none") return el;
+  }
+  return $("card");
+}
+
+// Resize the OS window to hug the visible card (handles compact / screen changes).
 async function syncSize() {
   await new Promise((r) => requestAnimationFrame(() => r()));
-  const rect = $("card").getBoundingClientRect();
+  const rect = visibleCard().getBoundingClientRect();
   const width = Math.max(1, Math.ceil(rect.width));
   const height = Math.max(1, Math.ceil(rect.height));
   try {
@@ -244,12 +264,222 @@ async function applyInitialState() {
   if (store.get("compact", false)) setCompact(true);
 }
 
+// ----- Licensing: 7-day trial + one-time lifetime unlock -----
+//
+// For previewing the screens on non-store builds (e.g. Windows), set localStorage
+// "hbw_dev_license" to "start", "trial", or "expired".
+function devLicenseMode() {
+  return localStorage.getItem("hbw_dev_license");
+}
+
+async function initLicensing() {
+  const dev = devLicenseMode();
+  const storeBuild = isMac || !!dev;
+
+  // Non-store builds (Windows/Linux/dev) stay fully open; Windows monetization is
+  // handled separately by the Microsoft Store.
+  if (!storeBuild) {
+    owned = true;
+    hasAccess = true;
+    needsTrialStart = false;
+    computeAccessAndUI();
+    return;
+  }
+
+  // Hide everything until we know the license, so the battery does not flash first.
+  for (const id of ["card", "trialCard", "lockCard"]) {
+    const el = $(id);
+    if (el) el.style.display = "none";
+  }
+  await syncSize();
+
+  if (dev) {
+    owned = false;
+    unlockPrice = "4,99 €"; // sample for previewing the UI only (real price is from the store)
+    if (dev === "start") trialStartMs = 0;
+    else if (dev === "trial") trialStartMs = Date.now() - 2 * 86400000;
+    else trialStartMs = Date.now() - 8 * 86400000; // expired
+    computeAccessAndUI();
+    return;
+  }
+
+  try {
+    const status = JSON.parse(await invoke("iap_status"));
+    owned = !!status.owned;
+    trialStartMs = Number(status.trialStartMs) || 0;
+  } catch {
+    owned = false;
+    trialStartMs = 0;
+  }
+  try {
+    unlockPrice = await invoke("iap_price"); // localized price from the App Store
+  } catch {
+    unlockPrice = "";
+  }
+  computeAccessAndUI();
+}
+
+function computeAccessAndUI() {
+  if (owned) {
+    hasAccess = true;
+    trialActive = false;
+    needsTrialStart = false;
+    applyLicenseUI(0);
+    return;
+  }
+  if (trialStartMs > 0) {
+    const msLeft = trialStartMs + TRIAL_DAYS * 86400000 - Date.now();
+    trialActive = msLeft > 0;
+    needsTrialStart = false;
+    hasAccess = trialActive;
+    applyLicenseUI(Math.max(0, Math.ceil(msLeft / 86400000)));
+    return;
+  }
+  // No trial started yet, not owned.
+  trialActive = false;
+  needsTrialStart = true;
+  hasAccess = false;
+  applyLicenseUI(0);
+}
+
+function applyLicenseUI(daysLeft) {
+  hideLicenseErrors();
+
+  const tp = $("trialPrice");
+  if (tp) tp.textContent = unlockPrice ? "of " + unlockPrice + " " : "";
+  const buyBtn = $("btnUnlock");
+  if (buyBtn) buyBtn.textContent = unlockPrice ? "Unlock - " + unlockPrice : "Unlock";
+
+  if (needsTrialStart) {
+    showScreen("trialCard");
+    return;
+  }
+  if (!hasAccess) {
+    showScreen("lockCard");
+    return;
+  }
+
+  // Owned or trialing: show the battery widget.
+  const bar = $("trialBar");
+  if (!owned && trialActive) {
+    $("trialText").textContent =
+      daysLeft === 1 ? "1 day left in your free trial" : daysLeft + " days left in your free trial";
+    bar.style.display = "";
+  } else {
+    bar.style.display = "none";
+  }
+  showScreen("card");
+  startBattery();
+}
+
+function showScreen(id) {
+  for (const s of ["card", "trialCard", "lockCard"]) {
+    const el = $(s);
+    if (el) el.style.display = s === id ? "" : "none";
+  }
+  syncSize();
+}
+
+function startBattery() {
+  if (batteryStarted) return;
+  batteryStarted = true;
+  refresh();
+}
+
+async function startTrial() {
+  hideLicenseErrors();
+  if (devLicenseMode()) {
+    trialStartMs = Date.now();
+    computeAccessAndUI();
+    return;
+  }
+  try {
+    const ms = await invoke("iap_start_trial");
+    trialStartMs = Number(ms) || Date.now();
+    computeAccessAndUI();
+  } catch (e) {
+    showLicenseError(friendlyStoreError(e));
+  }
+}
+
+async function buyUnlock() {
+  hideLicenseErrors();
+  if (devLicenseMode()) {
+    owned = true;
+    computeAccessAndUI();
+    return;
+  }
+  try {
+    const ok = await invoke("iap_buy");
+    if (ok) {
+      owned = true;
+      computeAccessAndUI();
+    }
+  } catch (e) {
+    showLicenseError(friendlyStoreError(e));
+  }
+}
+
+async function restoreUnlock() {
+  hideLicenseErrors();
+  try {
+    await invoke("iap_restore");
+    const status = JSON.parse(await invoke("iap_status"));
+    owned = !!status.owned;
+    trialStartMs = Number(status.trialStartMs) || 0;
+    if (!owned && trialStartMs === 0) {
+      showLicenseError("No previous purchase was found for this Apple ID.");
+    }
+    computeAccessAndUI();
+  } catch (e) {
+    showLicenseError(friendlyStoreError(e));
+  }
+}
+
+function friendlyStoreError(e) {
+  const msg = String(e || "");
+  if (msg.includes("store_unavailable")) return "The store is not reachable right now. Please try again.";
+  if (msg.toLowerCase().includes("mac app store build")) return msg;
+  return "Something went wrong with the store. Please try again.";
+}
+
+function showLicenseError(msg) {
+  for (const id of ["trialError", "lockError"]) {
+    const el = $(id);
+    if (el) {
+      el.textContent = msg;
+      el.style.display = "";
+    }
+  }
+}
+
+function hideLicenseErrors() {
+  for (const id of ["trialError", "lockError"]) {
+    const el = $(id);
+    if (el) el.style.display = "none";
+  }
+}
+
+function wireLicense() {
+  $("btnStartTrial").addEventListener("click", () => startTrial());
+  $("btnRestoreTrial").addEventListener("click", () => restoreUnlock());
+  $("btnUnlock").addEventListener("click", () => buyUnlock());
+  $("btnRestoreLock").addEventListener("click", () => restoreUnlock());
+  $("trialUnlock").addEventListener("click", () => buyUnlock());
+  $("btnQuitTrial").addEventListener("click", () => invoke("quit"));
+  $("btnQuitLock").addEventListener("click", () => invoke("quit"));
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
   wireLinks();
+  wireLicense();
   await initControls();
   await applyInitialState();
-  await syncSize();
-  listen("refresh-now", () => refresh());
-  listen("open-diagnostics", () => openDiagnostics());
-  refresh();
+  listen("refresh-now", () => {
+    if (hasAccess) refresh();
+  });
+  listen("open-diagnostics", () => {
+    if (hasAccess) openDiagnostics();
+  });
+  await initLicensing();
 });

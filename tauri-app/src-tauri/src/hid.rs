@@ -1,8 +1,16 @@
 // Headset battery reading over raw USB/HID.
 // Faithful port of the original C# HidApi.cs + HidApiProtocol.cs logic.
+//
+// IMPORTANT (macOS): every hidapi call runs on ONE dedicated, long-lived thread
+// (see `sender` / `worker`). Enumerating the IOHIDManager from many different
+// threads - which is what happens when each poll runs on the async blocking pool -
+// corrupts CoreFoundation state and hard-crashes with SIGILL inside
+// CFRunLoopAddSource. A single worker thread that reuses one HidApi keeps it stable.
 
 use hidapi::{DeviceInfo, HidApi, HidDevice};
 use serde::Serialize;
+use std::sync::mpsc;
+use std::sync::{Mutex, OnceLock};
 
 // Supported (vendor_id, product_id) pairs, in priority order (matches the original).
 const DEVICES: &[(u16, u16)] = &[
@@ -44,6 +52,74 @@ pub struct DeviceRow {
     pub path: String,
 }
 
+// ---- Dedicated HID thread ----
+
+enum Request {
+    Read(mpsc::Sender<BatteryReading>),
+    List(mpsc::Sender<Vec<DeviceRow>>),
+}
+
+// Lazily starts the single HID worker thread on first use and hands back its channel.
+fn sender() -> &'static Mutex<mpsc::Sender<Request>> {
+    static SENDER: OnceLock<Mutex<mpsc::Sender<Request>>> = OnceLock::new();
+    SENDER.get_or_init(|| {
+        let (tx, rx) = mpsc::channel::<Request>();
+        std::thread::Builder::new()
+            .name("hid-worker".into())
+            .spawn(move || worker(rx))
+            .ok();
+        Mutex::new(tx)
+    })
+}
+
+// Owns one HidApi for the whole app life and serves a single request at a time.
+fn worker(rx: mpsc::Receiver<Request>) {
+    let mut api: Option<HidApi> = HidApi::new().ok();
+    while let Ok(req) = rx.recv() {
+        if api.is_none() {
+            api = HidApi::new().ok();
+        }
+        match req {
+            Request::Read(reply) => {
+                let reading = match api.as_mut() {
+                    Some(a) => read_battery_inner(a),
+                    None => BatteryReading::fail("HID init failed.", String::new()),
+                };
+                let _ = reply.send(reading);
+            }
+            Request::List(reply) => {
+                let rows = match api.as_mut() {
+                    Some(a) => list_devices_inner(a),
+                    None => Vec::new(),
+                };
+                let _ = reply.send(rows);
+            }
+        }
+    }
+}
+
+pub fn read_battery() -> BatteryReading {
+    let (tx, rx) = mpsc::channel();
+    let sent = sender().lock().ok().map(|s| s.send(Request::Read(tx)));
+    match sent {
+        Some(Ok(())) => rx
+            .recv()
+            .unwrap_or_else(|_| BatteryReading::fail("HID worker stopped.", String::new())),
+        _ => BatteryReading::fail("HID unavailable.", String::new()),
+    }
+}
+
+pub fn list_devices() -> Vec<DeviceRow> {
+    let (tx, rx) = mpsc::channel();
+    let sent = sender().lock().ok().map(|s| s.send(Request::List(tx)));
+    match sent {
+        Some(Ok(())) => rx.recv().unwrap_or_default(),
+        _ => Vec::new(),
+    }
+}
+
+// ---- HID logic (only ever called on the worker thread) ----
+
 // Pick the first supported (vid,pid) pair that has any device present, then the
 // interface with the highest usage / usage_page (same selection as the original).
 fn select_device(api: &HidApi) -> Option<&DeviceInfo> {
@@ -72,13 +148,13 @@ fn select_device(api: &HidApi) -> Option<&DeviceInfo> {
     None
 }
 
-pub fn read_battery() -> BatteryReading {
-    let api = match HidApi::new() {
-        Ok(a) => a,
-        Err(e) => return BatteryReading::fail(&format!("HID init failed: {e}"), String::new()),
-    };
+fn read_battery_inner(api: &mut HidApi) -> BatteryReading {
+    // Re-scan so a headset connected after launch is picked up.
+    if api.refresh_devices().is_err() {
+        return BatteryReading::fail("HID refresh failed.", String::new());
+    }
 
-    let info = match select_device(&api) {
+    let info = match select_device(api) {
         Some(i) => i,
         None => return BatteryReading::fail("No headset device detected.", String::new()),
     };
@@ -169,11 +245,8 @@ fn get_battery_level(dev: &HidDevice, manufacturer: &str, product: &str) -> i32 
     data_buffer[battery_index] as i32
 }
 
-pub fn list_devices() -> Vec<DeviceRow> {
-    let api = match HidApi::new() {
-        Ok(a) => a,
-        Err(_) => return Vec::new(),
-    };
+fn list_devices_inner(api: &mut HidApi) -> Vec<DeviceRow> {
+    let _ = api.refresh_devices();
 
     let mut rows = Vec::new();
     for &(vid, pid) in DEVICES {

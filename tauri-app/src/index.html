@@ -2,6 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // macOS ships a solid (opaque) window, so mark the root and let the CSS drop the
+      // rounded corners that would otherwise show the window backing as white.
+      if (navigator.userAgent.indexOf("Mac") !== -1)
+        document.documentElement.classList.add("mac");
+    </script>
     <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Headset Battery Widget</title>
@@ -75,6 +81,29 @@
           </div>
         </div>
       </div>
+
+      <div class="trial-bar" id="trialBar" style="display:none" data-tauri-drag-region>
+        <span id="trialText"></span>
+        <button class="trial-unlock" id="trialUnlock">Unlock</button>
+      </div>
+    </div>
+
+    <div class="card lic-card" id="trialCard" style="display:none" data-tauri-drag-region>
+      <button class="close-btn" id="btnQuitTrial" title="Quit">&#215;</button>
+      <div class="lic-title">Try free for 7 days</div>
+      <div class="lic-body">Everything works during your free trial. After it ends, a one-time purchase <span id="trialPrice"></span>unlocks it for good. No subscription.</div>
+      <button class="lic-buy" id="btnStartTrial">Start 7-day free trial</button>
+      <button class="lic-restore" id="btnRestoreTrial">Restore purchase</button>
+      <div class="lic-error" id="trialError" style="display:none"></div>
+    </div>
+
+    <div class="card lic-card" id="lockCard" style="display:none" data-tauri-drag-region>
+      <button class="close-btn" id="btnQuitLock" title="Quit">&#215;</button>
+      <div class="lic-title">Your free trial has ended</div>
+      <div class="lic-body">Unlock Headset Battery Widget to keep using it. One payment, yours forever.</div>
+      <button class="lic-buy" id="btnUnlock">Unlock</button>
+      <button class="lic-restore" id="btnRestoreLock">Restore purchase</button>
+      <div class="lic-error" id="lockError" style="display:none"></div>
     </div>
   </body>
 </html>

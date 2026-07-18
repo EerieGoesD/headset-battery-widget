@@ -293,3 +293,122 @@ a {
 .card.compact .left {
   gap: 0;
 }
+
+/* macOS: the window is solid (not see-through), so fill it edge to edge with a solid
+   dark rectangle. Rounded corners here would let the window backing show as white. */
+html.mac,
+html.mac body {
+  background: #0a0a0c;
+}
+
+html.mac .card {
+  background: #0a0a0c;
+  border: none;
+  border-radius: 0;
+}
+
+/* macOS has no taskbar (skipTaskbar only affects Windows/Linux), so hide the
+   "Hide taskbar" option on macOS - it would do nothing there. */
+html.mac .chk:has(#chkHideTaskbar) {
+  display: none;
+}
+
+/* Launch at startup uses a LaunchAgent, which the Mac App Store sandbox blocks,
+   so hide that option on macOS too - it cannot work on the store build. */
+html.mac .chk:has(#chkAutostart) {
+  display: none;
+}
+
+/* ---- Licensing: trial-start screen, paywall, and trial countdown bar ---- */
+.lic-card {
+  text-align: center;
+  padding: 14px 14px 12px;
+}
+
+.lic-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f4f4f5;
+  margin-bottom: 6px;
+}
+
+.lic-body {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #a1a1aa;
+  margin-bottom: 10px;
+}
+
+.lic-buy {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #6366f1;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.lic-buy:hover {
+  background: #818cf8;
+}
+
+.lic-restore {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px;
+  font-size: 11px;
+  color: #a1a1aa;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.lic-restore:hover {
+  color: #d4d4d8;
+}
+
+.lic-error {
+  margin-top: 8px;
+  font-size: 10px;
+  color: #f87171;
+}
+
+/* Countdown bar under the battery while trialing. */
+.trial-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  color: #a1a1aa;
+}
+
+.trial-unlock {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: #6366f1;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.trial-unlock:hover {
+  background: #818cf8;
+}
+
+/* The trial bar is meaningless in compact mode; hide it there. */
+.card.compact .trial-bar {
+  display: none !important;
+}
