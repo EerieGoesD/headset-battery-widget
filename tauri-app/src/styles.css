@@ -376,7 +376,7 @@ html.mac .chk:has(#chkAutostart) {
 .lic-error {
   margin-top: 8px;
   font-size: 10px;
-  color: #f87171;
+  color: #f87171; overflow-wrap: anywhere;
 }
 
 /* Countdown bar under the battery while trialing. */

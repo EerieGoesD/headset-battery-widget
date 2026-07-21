@@ -398,7 +398,7 @@ async function startTrial() {
     trialStartMs = Number(ms) || Date.now();
     computeAccessAndUI();
   } catch (e) {
-    showLicenseError(friendlyStoreError(e));
+    showLicenseError(friendlyStoreError(e)); syncSize();
   }
 }
 
@@ -416,7 +416,7 @@ async function buyUnlock() {
       computeAccessAndUI();
     }
   } catch (e) {
-    showLicenseError(friendlyStoreError(e));
+    showLicenseError(friendlyStoreError(e)); syncSize();
   }
 }
 
@@ -432,15 +432,15 @@ async function restoreUnlock() {
     }
     computeAccessAndUI();
   } catch (e) {
-    showLicenseError(friendlyStoreError(e));
+    showLicenseError(friendlyStoreError(e)); syncSize();
   }
 }
 
 function friendlyStoreError(e) {
   const msg = String(e || "");
-  if (msg.includes("store_unavailable")) return "The store is not reachable right now. Please try again.";
+  if (msg.includes("store_unavailable")) return msg;
   if (msg.toLowerCase().includes("mac app store build")) return msg;
-  return "Something went wrong with the store. Please try again.";
+  return msg;
 }
 
 function showLicenseError(msg) {
