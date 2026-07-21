@@ -95,9 +95,9 @@ fn show_context_menu(app: tauri::AppHandle) -> Result<(), String> {
 // On macOS the source of truth is StoreKit; license.json is just a local cache.
 
 #[allow(dead_code)]
-const UNLOCK_ID: &str = "com.eeriegoesd.headset-battery-widget.unlock";
+const UNLOCK_ID: &str = "com.eeriegoesd.headset_battery_widget.unlock";
 #[allow(dead_code)]
-const TRIAL_ID: &str = "com.eeriegoesd.headset-battery-widget.trial";
+const TRIAL_ID: &str = "com.eeriegoesd.headset_battery_widget.trial";
 
 fn data_dir(app: &tauri::AppHandle) -> std::path::PathBuf {
     let dir = app
